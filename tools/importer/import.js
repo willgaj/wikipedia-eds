@@ -25,7 +25,7 @@ const REMOVE_SELECTORS = [
   '.shortdescription',
   'figure', 'audio', 'video', 'img', '.mw-file-element',
   '.navbox', '.navbox-styles', '.authority-control',
-  '.portal-bar', '.side-box', '.sistersitebox',
+  '.portal-bar', '.side-box', '.sistersitebox', '.spoken-wikipedia',
   '.mw-cite-backlink',
   '.Z3988',
   '.mw-editsection',
@@ -203,6 +203,8 @@ function normalizeHeadings(document, root) {
 }
 
 function normalizeLinks(root) {
+  // red links (article does not exist) -> plain text, as Wikipedia readers see them
+  root.querySelectorAll('a.new, a[href*="redlink=1"]').forEach(unwrap);
   root.querySelectorAll('a[href]').forEach((a) => {
     const href = a.getAttribute('href');
     if (href.startsWith('./')) a.setAttribute('href', `${WIKI_ORIGIN}/wiki/${href.slice(2)}`);
@@ -281,6 +283,16 @@ export default {
     const h1 = document.createElement('h1');
     h1.textContent = src.title;
     main.append(h1, ...root.childNodes);
+
+    // runs of bare inline content left by unwrapped containers -> one paragraph each
+    let run = null;
+    [...main.childNodes].forEach((n) => {
+      const inline = n.nodeType === 3 || /^(A|EM|STRONG|SUP|SUB|U|DEL|CODE|BR)$/.test(n.nodeName);
+      if (!inline) { run = null; return; }
+      if (n.nodeType === 3 && !n.textContent.trim() && !run) { n.remove(); return; }
+      if (!run) { run = document.createElement('p'); n.before(run); }
+      run.append(n);
+    });
 
     // one EDS section per h2
     main.querySelectorAll(':scope > h2').forEach((h2) => h2.before(document.createElement('hr')));

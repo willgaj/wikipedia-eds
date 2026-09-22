@@ -345,6 +345,7 @@ body.article main sup {
   white-space: nowrap;
 }
 
-body.article main sup > a:any-link {
+/* inline ref markers, targeted by references-block backlinks */
+body.article main a[id*="-ref-"] {
   scroll-margin-top: calc(var(--nav-height) + 16px);
 }
