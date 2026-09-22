@@ -1,0 +1,11 @@
+.attribution {
+  border-top: 1px solid var(--infobox-border-color, #a2a9b1);
+  padding-top: 1em;
+  color: var(--dark-color);
+  font-size: var(--body-font-size-xs);
+  line-height: 1.5;
+}
+
+.attribution p {
+  margin: 0 0 0.5em;
+}
