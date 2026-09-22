@@ -1,0 +1,53 @@
+.infobox table {
+  width: 100%;
+  border: 1px solid var(--infobox-border-color, #a2a9b1);
+  border-collapse: collapse;
+  background-color: var(--light-color);
+  font-size: var(--body-font-size-xs);
+  line-height: 1.5;
+}
+
+.infobox caption {
+  padding: 0.4em;
+  font-family: var(--heading-font-family);
+  font-size: var(--heading-font-size-s);
+  font-weight: 600;
+  text-align: center;
+}
+
+.infobox th,
+.infobox td {
+  padding: 0.25em 0.5em;
+  vertical-align: top;
+  text-align: left;
+}
+
+.infobox th[scope="row"] {
+  width: 35%;
+  font-weight: 600;
+}
+
+.infobox .infobox-heading {
+  padding-top: 0.5em;
+  border-top: 1px solid var(--infobox-border-color, #a2a9b1);
+  text-align: center;
+}
+
+.infobox ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.infobox p {
+  margin: 0;
+}
+
+@media (width >= 900px) {
+  main .infobox-wrapper {
+    float: right;
+    clear: right;
+    width: 22em;
+    margin: 0.5em 0 1em 1.5em;
+  }
+}

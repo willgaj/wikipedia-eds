@@ -323,3 +323,29 @@ main .section.highlight {
   margin: 0;
   padding: 40px 0;
 }
+
+/* article template (Wikipedia imports) */
+body.article main > .section::after {
+  content: "";
+  display: table;
+  clear: both;
+}
+
+body.article main h2 {
+  padding-bottom: 0.15em;
+  border-bottom: 1px solid var(--infobox-border-color, #a2a9b1);
+}
+
+sup {
+  line-height: 0;
+}
+
+body.article main sup {
+  font-size: 0.7em;
+  white-space: nowrap;
+}
+
+/* inline ref markers, targeted by references-block backlinks */
+body.article main a[id*="-ref-"] {
+  scroll-margin-top: calc(var(--nav-height) + 16px);
+}

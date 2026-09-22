@@ -1,0 +1,41 @@
+.references {
+  font-size: var(--body-font-size-xs);
+  line-height: 1.5;
+}
+
+.references ol {
+  margin: 0;
+  padding-left: 2.5em;
+}
+
+.references.notes ol {
+  list-style-type: lower-alpha;
+}
+
+.references li {
+  margin-bottom: 0.25em;
+  break-inside: avoid;
+  scroll-margin-top: calc(var(--nav-height) + 16px);
+}
+
+.references li:target {
+  background-color: var(--references-target-color, #eaf3ff);
+}
+
+.references-backlinks {
+  margin-right: 0.35em;
+}
+
+.references-backlinks a {
+  margin-right: 0.2em;
+  font-size: 0.85em;
+  font-style: italic;
+  font-weight: 600;
+}
+
+@media (width >= 900px) {
+  .references:not(.notes) ol {
+    column-width: 30em;
+    column-gap: 2em;
+  }
+}
