@@ -75,9 +75,11 @@ export const publish = (webPath) => call('POST', adminUrl('live', webPath));
  * publish role or higher. Order: DA source (optional), live, preview.
  */
 export async function unpublish(webPath, { removeSource = false } = {}) {
-  if (removeSource) await deleteSource(webPath);
-  await call('DELETE', adminUrl('live', webPath));
-  await call('DELETE', adminUrl('preview', webPath));
+  // 404 = never published / already removed; keep going so a partial run can be repeated
+  const gone = (e) => { if (!/ -> 404\b/.test(e.message)) throw e; };
+  if (removeSource) await deleteSource(webPath).catch(gone);
+  await call('DELETE', adminUrl('live', webPath)).catch(gone);
+  await call('DELETE', adminUrl('preview', webPath)).catch(gone);
 }
 
 /**

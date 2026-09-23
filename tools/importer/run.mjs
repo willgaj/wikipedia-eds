@@ -8,7 +8,8 @@
  * <source-url> should pin a revision so attribution carries a permalink:
  *   https://en.wikipedia.org/w/index.php?title=Nikola_Tesla&oldid=1372910045&action=render
  *
- * Always writes <out>/<path>.html and <path>.report.json. Validation errors stop before upload.
+ * Always writes <out>/<path>.html, .report.json and .source.html (the fetched input).
+ * Validation errors stop before upload.
  * Env: WIKIMEDIA_USER_AGENT (see https://foundation.wikimedia.org/wiki/Policy:User-Agent_policy),
  *      DA_TOKEN, AEM_ORG / AEM_SITE / AEM_REF (see ../lib/admin.mjs).
  */
@@ -50,10 +51,24 @@ if (!new URL(sourceUrl).searchParams.get('oldid')) {
 
 const step = (msg) => console.log(`• ${msg}`);
 
+/**
+ * Wikipedia intermittently answers ?action=render with 500 for a page (observed for minutes at a
+ * time, independent of request headers), so retry 5xx/429 with backoff before giving up.
+ */
+async function fetchSource(url, attempts = 5) {
+  for (let i = 1; ; i += 1) {
+    const resp = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    if (resp.ok) return resp.text();
+    const retryable = resp.status >= 500 || resp.status === 429;
+    if (!retryable || i >= attempts) throw new Error(`fetch ${url} -> ${resp.status} after ${i} attempt(s)`);
+    const wait = Number(resp.headers.get('retry-after')) * 1000 || 2000 * 2 ** (i - 1);
+    console.warn(`  fetch -> ${resp.status}, retrying in ${wait / 1000}s (${i}/${attempts})`);
+    await new Promise((r) => { setTimeout(r, wait); });
+  }
+}
+
 // 1. fetch
-const resp = await fetch(sourceUrl, { headers: { 'User-Agent': USER_AGENT } });
-if (!resp.ok) throw new Error(`fetch ${sourceUrl} -> ${resp.status}`);
-const html = await resp.text();
+const html = await fetchSource(sourceUrl);
 step(`fetched ${sourceUrl} (${html.length} bytes)`);
 
 // 2. transform (import.js expects the importer UI's WebImporter global)
@@ -71,6 +86,7 @@ const report = { source: sourceUrl, webPath, ...validateDaHtml(daHtml) };
 const outFile = path.join(opts.out, `${webPath.replace(/^\//, '') || 'index'}.html`);
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 fs.writeFileSync(outFile, daHtml);
+fs.writeFileSync(outFile.replace(/\.html$/, '.source.html'), html); // what the transform received
 const writeReport = () => fs.writeFileSync(outFile.replace(/\.html$/, '.report.json'), `${JSON.stringify(report, null, 2)}\n`);
 writeReport();
 step(`wrote ${path.relative(process.cwd(), outFile)} -> ${webPath}`);

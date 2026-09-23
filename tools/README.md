@@ -23,10 +23,12 @@ npm run import -- "https://en.wikipedia.org/w/index.php?title=Nikola_Tesla&oldid
 
 Pin the revision with `oldid`: the attribution block links to it. Steps, in order; each flag is optional:
 
-1. fetch the Parsoid `?action=render` HTML
+1. fetch the Parsoid `?action=render` HTML (retries 5xx/429 with backoff: Wikipedia intermittently
+   returns 500 for a page)
 2. run `importer/import.js` (the content model: infobox, hatnote, references, attribution, metadata)
 3. convert to a DA document (`importer/lib/da-html.mjs`) and validate it (`importer/lib/validate.mjs`);
-   writes `tools/output/import/<path>.html` + `.report.json`, and stops on errors
+   writes `tools/output/import/<path>.html`, `.report.json` and `.source.html` (the fetched input),
+   and stops on errors (including block names with no code in `blocks/`)
 4. `--upload` to DA, `--preview`, `--check-delivered` (compares `.plain.html` with what was uploaded),
    `--publish`
 

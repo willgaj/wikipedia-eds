@@ -4,9 +4,21 @@
  *   compareDelivered   - the uploaded document vs. the pipeline's .plain.html after preview
  * Errors block an upload; warnings are reported only.
  */
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
 
 const REQUIRED_METADATA = ['title', 'description', 'source-url', 'license'];
+
+// Block names that resolve to code: folders in /blocks plus the pipeline-consumed metadata blocks.
+// Anything else renders as unstyled divs (e.g. a source <table> turned into a "block").
+const BLOCKS_DIR = fileURLToPath(new URL('../../../blocks/', import.meta.url));
+const KNOWN_BLOCKS = new Set([
+  ...fs.readdirSync(BLOCKS_DIR, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name),
+  'metadata', 'section-metadata',
+]);
 
 const parse = (html) => new JSDOM(html).window.document;
 const count = (root, selector) => root.querySelectorAll(selector).length;
@@ -48,6 +60,11 @@ export function validateDaHtml(html) {
   const s = stats(doc);
 
   if (s.h1 !== 1) errors.push(`expected 1 <h1>, found ${s.h1}`);
+
+  const unknownBlocks = Object.keys(s.blocks).filter((c) => !KNOWN_BLOCKS.has(c.split(' ')[0]));
+  if (unknownBlocks.length) {
+    errors.push(`unknown block(s), no code in /blocks: ${unknownBlocks.map((c) => c.slice(0, 40)).join(', ')}`);
+  }
 
   // licensing: attribution and source metadata are required on every page
   const meta = {};
