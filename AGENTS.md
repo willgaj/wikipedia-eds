@@ -19,6 +19,7 @@ Edge Delivery Services. Read a block first. Omissions are in the repo or known.
 - Merging `main` ships code; content publishes separately.
 - A PR without a `{branch}--wikipedia-eds--willgaj.aem.page/{path}` link is rejected.
 - All committed files are served. Use `.hlxignore`.
+- Import, publish, verify: `npm run import|admin|verify:*`. See `tools/README.md`.
 - Skills: `/plugin marketplace add adobe/skills`, then `aem-edge-delivery-services` (24 skills, incl. `docs-search`).
 
 ## Project-specific notes
