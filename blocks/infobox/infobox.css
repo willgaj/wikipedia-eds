@@ -1,8 +1,12 @@
+/* border on the block, not the table: a <caption> renders outside the table's border box */
+.infobox {
+  border: 1px solid var(--infobox-border-color, #a2a9b1);
+  background-color: var(--light-color);
+}
+
 .infobox table {
   width: 100%;
-  border: 1px solid var(--infobox-border-color, #a2a9b1);
   border-collapse: collapse;
-  background-color: var(--light-color);
   font-size: var(--body-font-size-xs);
   line-height: 1.5;
 }

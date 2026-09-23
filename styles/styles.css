@@ -349,3 +349,24 @@ body.article main sup {
 body.article main a[id*="-ref-"] {
   scroll-margin-top: calc(var(--nav-height) + 16px);
 }
+
+/* portal template (homepage) */
+body.portal main > .section > .default-content-wrapper {
+  text-align: center;
+}
+
+body.portal main h1 {
+  margin-top: 0.75em;
+  margin-bottom: 0;
+  letter-spacing: 0.02em;
+}
+
+body.portal main h1 + p {
+  margin-top: 0.25em;
+  color: var(--dark-color);
+  font-size: var(--body-font-size-s);
+}
+
+body.portal main > .section > .article-list-wrapper {
+  max-width: 1000px;
+}

@@ -1,0 +1,59 @@
+.article-list .article-list-count,
+.article-list .article-list-message {
+  margin: 0 0 1em;
+  color: var(--dark-color);
+  font-size: var(--body-font-size-s);
+  text-align: center;
+}
+
+.article-list ul {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.article-list li {
+  position: relative;
+  border: 1px solid var(--infobox-border-color, #a2a9b1);
+  border-radius: 4px;
+  padding: 16px;
+  background-color: var(--background-color);
+}
+
+.article-list li:hover,
+.article-list li:focus-within {
+  background-color: var(--light-color);
+}
+
+.article-list h2 {
+  margin: 0;
+  font-size: var(--heading-font-size-xs);
+}
+
+/* whole card is clickable via the title link */
+.article-list h2 a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.article-list p {
+  margin: 0.25em 0 0;
+  color: var(--dark-color);
+  font-size: var(--body-font-size-xs);
+}
+
+@media (width >= 600px) {
+  .article-list ul {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (width >= 900px) {
+  .article-list ul {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
