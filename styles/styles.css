@@ -350,6 +350,16 @@ body.article main a[id*="-ref-"] {
   scroll-margin-top: calc(var(--nav-height) + 16px);
 }
 
+main blockquote {
+  margin: 1em 0 1em 1.5em;
+  border-left: 3px solid var(--infobox-border-color, #a2a9b1);
+  padding-left: 1em;
+}
+
+main blockquote p {
+  margin: 0.25em 0;
+}
+
 /* portal template (homepage) */
 body.portal main > .section > .default-content-wrapper {
   text-align: center;
@@ -369,4 +379,15 @@ body.portal main h1 + p {
 
 body.portal main > .section > .article-list-wrapper {
   max-width: 1000px;
+}
+
+/* maths: TeX code spans until /scripts/math.js renders them to MathML */
+main .math-display {
+  display: block;
+  margin: 0.5em 0;
+  overflow: auto hidden;
+}
+
+main code.math-error {
+  color: var(--math-error-color, #b22222);
 }

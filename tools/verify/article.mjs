@@ -60,6 +60,11 @@ function inspect() {
     } : null,
     attributionOk: !!attribution?.querySelector('a[href^="https://creativecommons.org/licenses/by-sa/"]')
       && !!attribution?.querySelector('a[href^="https://en.wikipedia.org/"]'),
+    mathRendered: document.querySelectorAll('main .math math').length,
+    mathPending: [...document.querySelectorAll('main code:not(.math-error)')]
+      .filter((c) => /^\$[\s\S]+\$$/.test(c.textContent.trim())).length,
+    mathErrors: [...document.querySelectorAll('main code.math-error')].map((c) => c.title.slice(0, 80)),
+    tables: document.querySelectorAll('main .table table').length,
     header: q('header .header')?.dataset.blockStatus,
     footer: q('footer .footer')?.dataset.blockStatus,
     hScroll: document.documentElement.scrollWidth > window.innerWidth,
@@ -73,6 +78,10 @@ try {
     const { page, problems } = await openPage(browser, viewport);
     await page.goto(url, { waitUntil: 'networkidle' });
     await loadFully(page);
+    // maths renders after sections load (scripts/math.js); wait until no TeX is left pending
+    await page.waitForFunction(() => ![...document.querySelectorAll('main code:not(.math-error)')]
+      .some((c) => /^\$[\s\S]+\$$/.test(c.textContent.trim())), null, { timeout: 15000 })
+      .catch(() => {});
     const r = await page.evaluate(inspect);
     await page.screenshot({ path: path.join(opts.out, `${slug}-${label}.png`) });
     failures += report(label, {
@@ -86,6 +95,7 @@ try {
       'backlink ids on every marker': [r.markersWithBacklinkIds === r.markers, `${r.markersWithBacklinkIds}/${r.markers}`],
       'infobox caption inside border': [!r.infobox || r.infobox.captionInside, r.infobox ? undefined : 'no infobox'],
       'infobox floats on desktop only': [!r.infobox || r.infobox.float === (label === 'desktop' ? 'right' : 'none'), r.infobox?.float],
+      'maths rendered': [!r.mathPending && !r.mathErrors.length, `${r.mathRendered} rendered, ${r.mathPending} pending${r.mathErrors.length ? `, errors: ${JSON.stringify(r.mathErrors)}` : ''}`],
       'no horizontal scroll': [!r.hScroll],
     });
     await page.close();

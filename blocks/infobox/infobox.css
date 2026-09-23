@@ -47,6 +47,13 @@
   margin: 0;
 }
 
+/* sub-header lines under the title: native name, settlement type */
+.infobox caption p + p {
+  font-family: var(--body-font-family);
+  font-size: var(--body-font-size-xs);
+  font-weight: normal;
+}
+
 @media (width >= 900px) {
   main .infobox-wrapper {
     float: right;

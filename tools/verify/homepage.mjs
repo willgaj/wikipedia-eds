@@ -12,6 +12,7 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { hostUrl } from '../lib/admin.mjs';
+import { fetch } from '../lib/http.mjs';
 import {
   VIEWPORTS, launch, openPage, loadFully, report,
 } from './lib/browser.mjs';

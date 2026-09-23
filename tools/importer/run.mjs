@@ -22,6 +22,7 @@ import { Blocks, DOMUtils } from '@adobe/helix-importer';
 import transformer from './import.js';
 import toDaHtml from './lib/da-html.mjs';
 import { validateDaHtml, compareDelivered } from './lib/validate.mjs';
+import { fetch } from '../lib/http.mjs';
 import {
   hostUrl, putSource, preview, publish,
 } from '../lib/admin.mjs';
@@ -81,8 +82,10 @@ const main = transformer.transformDOM({
 const webPath = transformer.generateDocumentPath({ document, url: sourceUrl, params });
 const daHtml = toDaHtml(document, main);
 
-// 3. validate + write
-const report = { source: sourceUrl, webPath, ...validateDaHtml(daHtml) };
+// 3. validate + write (the transform's own counts let validation detect silent content loss)
+const report = {
+  source: sourceUrl, webPath, transform: params.report, ...validateDaHtml(daHtml, params.report),
+};
 const outFile = path.join(opts.out, `${webPath.replace(/^\//, '') || 'index'}.html`);
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 fs.writeFileSync(outFile, daHtml);
@@ -90,6 +93,7 @@ fs.writeFileSync(outFile.replace(/\.html$/, '.source.html'), html); // what the 
 const writeReport = () => fs.writeFileSync(outFile.replace(/\.html$/, '.report.json'), `${JSON.stringify(report, null, 2)}\n`);
 writeReport();
 step(`wrote ${path.relative(process.cwd(), outFile)} -> ${webPath}`);
+console.log(`  transform: ${JSON.stringify(report.transform)}`);
 console.log(`  stats: ${JSON.stringify(report.stats)}`);
 report.warnings.forEach((w) => console.log(`  warning: ${w}`));
 report.errors.forEach((e) => console.log(`  ERROR: ${e}`));
@@ -103,6 +107,7 @@ if (opts.upload) { await putSource(webPath, daHtml); step('uploaded to DA'); }
 if (opts.preview) { await preview(webPath); step(`previewed ${hostUrl('page')}${webPath}`); }
 if (opts['check-delivered']) {
   const plain = await fetch(`${hostUrl('page')}${webPath}.plain.html`).then((r) => r.text());
+  if (!plain.includes('<div')) throw new Error('delivered .plain.html is not HTML (undecoded response?)');
   report.delivered = compareDelivered(daHtml, plain);
   writeReport();
   report.delivered.errors.forEach((e) => console.log(`  DELIVERED MISMATCH: ${e}`));

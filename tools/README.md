@@ -25,7 +25,12 @@ Pin the revision with `oldid`: the attribution block links to it. Steps, in orde
 
 1. fetch the Parsoid `?action=render` HTML (retries 5xx/429 with backoff: Wikipedia intermittently
    returns 500 for a page)
-2. run `importer/import.js` (the content model: infobox, hatnote, references, attribution, metadata)
+2. run `importer/import.js` (the content model: blocks infobox, hatnote, table, references,
+   attribution, metadata; maths as TeX in code spans, `$…$` inline and `$$…$$` displayed,
+   rendered in the browser by `/scripts/math.js` with vendored Temml). Tables: a spanning title
+   row becomes the caption; tables with ≤ 3 rows and > 4 columns are transposed; one-column
+   tables become ordinary content. Articles without a Wikipedia short description get the
+   lead's first sentence as description.
 3. convert to a DA document (`importer/lib/da-html.mjs`) and validate it (`importer/lib/validate.mjs`);
    writes `tools/output/import/<path>.html`, `.report.json` and `.source.html` (the fetched input),
    and stops on errors (including block names with no code in `blocks/`)
@@ -64,3 +69,11 @@ npm run verify:home -- --mock 30         # same page, 30 made-up index rows (not
 Both check desktop and mobile, write screenshots to `tools/output/verify/`, and exit 1 on failure.
 
 Defaults target `willgaj/wikipedia-eds` on `main`; override with `AEM_ORG`, `AEM_SITE`, `AEM_REF`.
+
+## Notes
+
+- Network calls in `tools/` use `fetch` from `tools/lib/http.mjs` (undici 8), not Node's global
+  `fetch`: once jsdom has loaded undici 8, Node's built-in fetch can return compressed bodies
+  undecoded, depending on import order.
+- The delivery pipeline drops links inside code spans, turns `dl/dd` into bullet lists and
+  percent-encodes non-ASCII URLs; the transform and validator account for all three.

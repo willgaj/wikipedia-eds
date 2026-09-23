@@ -189,6 +189,11 @@ async function loadLazy(doc) {
   const main = doc.querySelector('main');
   await loadSections(main);
 
+  // maths as `$…$` code spans (Wikipedia imports); the renderer loads only when present
+  if (main.querySelector('code')) {
+    import('./math.js').then(({ default: decorateMath }) => decorateMath(main));
+  }
+
   const { hash } = window.location;
   const element = hash ? doc.getElementById(hash.substring(1)) : false;
   if (hash && element) element.scrollIntoView();

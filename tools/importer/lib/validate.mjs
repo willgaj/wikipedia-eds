@@ -38,11 +38,15 @@ function stats(doc) {
   blockRoots(doc).forEach((b) => { blocks[b.className] = (blocks[b.className] || 0) + 1; });
   const citations = doc.querySelector('.references:not(.notes)');
   const notes = doc.querySelector('.references.notes');
+  const tables = blockRoots(doc).filter((b) => b.classList.contains('table'));
   return {
+    mathCodes: [...doc.querySelectorAll('code')].filter((c) => /^\$[\s\S]+\$$/.test(c.textContent.trim())).length,
+    tableCells: tables.reduce((n, t) => n + t.querySelectorAll(':scope > div > div').length, 0),
     sections: (doc.querySelector('main') ? doc.querySelectorAll('main > div') : doc.querySelectorAll('body > div')).length,
     h1: count(doc, 'h1'),
     h2: count(doc, 'h2'),
     h3: count(doc, 'h3'),
+    h4: count(doc, 'h4'),
     blocks,
     links: count(doc, 'a[href]'),
     listItems: count(doc, 'li'),
@@ -52,12 +56,36 @@ function stats(doc) {
   };
 }
 
-/** @returns {{ errors: string[], warnings: string[], stats: object }} */
-export function validateDaHtml(html) {
+/**
+ * @param {string} html DA document
+ * @param {object} [expected] the transform's report (counts of converted maths and tables)
+ * @returns {{ errors: string[], warnings: string[], stats: object }}
+ */
+export function validateDaHtml(html, expected = {}) {
   const doc = parse(html);
   const errors = [];
   const warnings = [];
   const s = stats(doc);
+
+  // content loss: everything the transform converted must still be in the document
+  if (expected.math) {
+    const want = expected.math.inline + expected.math.display;
+    if (s.mathCodes !== want) errors.push(`maths: converted ${want}, document has ${s.mathCodes}`);
+    if (expected.math.chem) warnings.push(`${expected.math.chem} chemistry formula(s): need mhchem, not vendored`);
+  }
+  if (expected.tables) {
+    const tableBlocks = Object.entries(s.blocks)
+      .filter(([k]) => k.split(' ')[0] === 'table')
+      .reduce((n, [, v]) => n + v, 0);
+    if (tableBlocks !== expected.tables.blocks) {
+      errors.push(`tables: converted ${expected.tables.blocks}, document has ${tableBlocks}`);
+    }
+    if (expected.tables.transposed) {
+      warnings.push(`${expected.tables.transposed} table(s) transposed (wide and short): check them`);
+    }
+    if (expected.tables.spans) warnings.push(`${expected.tables.spans} merged cell(s) split in tables`);
+  }
+  if (expected.descriptionFromLead) warnings.push('no short description: using the lead\'s first sentence');
 
   if (s.h1 !== 1) errors.push(`expected 1 <h1>, found ${s.h1}`);
 
@@ -83,7 +111,15 @@ export function validateDaHtml(html) {
 
   // markup the DA contract forbids or the transform should have removed
   const leftovers = {
-    span: 'span', style: 'style, [style]', script: 'script', img: 'img, picture', table: 'table', id: '[id]',
+    span: 'span',
+    style: 'style, [style]',
+    script: 'script',
+    img: 'img, picture',
+    table: 'table',
+    id: '[id]',
+    'definition list': 'dl, dt, dd',
+    big: 'big',
+    math: 'math',
   };
   Object.entries(leftovers).forEach(([name, sel]) => {
     const n = count(doc, sel);
@@ -92,6 +128,8 @@ export function validateDaHtml(html) {
   const roots = new Set(blockRoots(doc));
   const stray = [...doc.querySelectorAll('main [class]')].filter((el) => !roots.has(el));
   if (stray.length) errors.push(`${stray.length} class attribute(s) outside block roots`);
+  const codeLinks = count(doc, 'code a');
+  if (codeLinks) errors.push(`${codeLinks} link(s) inside code spans (the pipeline drops them)`);
   const redlinks = count(doc, 'a[href*="redlink=1"]');
   if (redlinks) errors.push(`${redlinks} red link(s) to non-existent articles`);
   const relative = count(doc, 'a[href^="./"], a[href^="../"]');
@@ -109,7 +147,7 @@ export function validateDaHtml(html) {
 
   const otherFragments = [...doc.querySelectorAll('a[href^="#"]')].map((a) => a.getAttribute('href')).filter((h) => !/^#(cite|note)-/.test(h));
   if (otherFragments.length) warnings.push(`fragment links other than references: ${[...new Set(otherFragments)].slice(0, 10).join(', ')}`);
-  const tiny = [...doc.querySelectorAll('main > div > p')].filter((p) => p.textContent.trim().split(/\s+/).length <= 2 && !p.querySelector('a, sup'));
+  const tiny = [...doc.querySelectorAll('main > div > p')].filter((p) => p.textContent.trim().split(/\s+/).length <= 2 && !p.querySelector('a, sup, code'));
   if (tiny.length) warnings.push(`${tiny.length} very short paragraph(s), e.g. "${tiny[0].textContent.trim()}" (leaked fragments?)`);
 
   return { errors, warnings, stats: s };
@@ -125,7 +163,8 @@ export function compareDelivered(daHtml, plainHtml) {
   const sa = stats(a);
   const sb = stats(b);
   const errors = [];
-  ['sections', 'h1', 'h2', 'h3', 'links', 'listItems', 'refLinks', 'citations', 'notes'].forEach((k) => {
+  ['sections', 'h1', 'h2', 'h3', 'h4', 'links', 'listItems', 'refLinks', 'citations', 'notes',
+    'mathCodes', 'tableCells'].forEach((k) => {
     if (sa[k] !== sb[k]) errors.push(`${k}: uploaded ${sa[k]}, delivered ${sb[k]}`);
   });
   const { metadata, ...uploadedBlocks } = sa.blocks;
