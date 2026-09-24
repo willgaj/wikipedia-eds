@@ -65,6 +65,25 @@ function inspect() {
       .filter((c) => /^\$[\s\S]+\$$/.test(c.textContent.trim())).length,
     mathErrors: [...document.querySelectorAll('main code.math-error')].map((c) => c.title.slice(0, 80)),
     tables: document.querySelectorAll('main .table table').length,
+    toc: (() => {
+      const heads = [...document.querySelectorAll('main .section > .default-content-wrapper > :is(h2, h3)')]
+        .filter((h) => h.id && h.textContent.trim());
+      const nav = q('main > nav.toc');
+      if (!nav) return { present: false, headings: heads.length };
+      const links = [...nav.querySelectorAll('a')];
+      const rect = nav.getBoundingClientRect();
+      const content = q('main > .section')?.getBoundingClientRect();
+      return {
+        present: true,
+        headings: heads.length,
+        entries: links.length,
+        unresolved: links.filter((a) => !document.getElementById(decodeURIComponent(a.getAttribute('href').slice(1)))).length,
+        open: nav.querySelector('details').open,
+        position: getComputedStyle(nav).position,
+        besideContent: rect.right <= (content?.left ?? 0) + 1,
+        height: Math.round(rect.height),
+      };
+    })(),
     header: q('header .header')?.dataset.blockStatus,
     footer: q('footer .footer')?.dataset.blockStatus,
     hScroll: document.documentElement.scrollWidth > window.innerWidth,
@@ -76,7 +95,15 @@ let failures = 0;
 try {
   for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     const { page, problems } = await openPage(browser, viewport);
+    await page.addInitScript(() => {
+      window.cls = 0;
+      new PerformanceObserver((list) => list.getEntries().forEach((e) => {
+        if (!e.hadRecentInput) window.cls += e.value;
+      })).observe({ type: 'layout-shift', buffered: true });
+    });
     await page.goto(url, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1000);
+    const cls = await page.evaluate(() => window.cls); // initial load, before any scrolling
     await loadFully(page);
     // maths renders after sections load (scripts/math.js); wait until no TeX is left pending
     await page.waitForFunction(() => ![...document.querySelectorAll('main code:not(.math-error)')]
@@ -84,6 +111,43 @@ try {
       .catch(() => {});
     const r = await page.evaluate(inspect);
     await page.screenshot({ path: path.join(opts.out, `${slug}-${label}.png`) });
+
+    // contents: stays in view and marks the section while scrolling; a jump lands below the header
+    let tocScroll = null;
+    let tocJump = null;
+    if (r.toc.present) {
+      tocScroll = await page.evaluate(async () => {
+        window.scrollTo(0, document.body.scrollHeight * 0.6);
+        await new Promise((res) => { setTimeout(res, 400); });
+        const nav = document.querySelector('main > nav.toc');
+        return {
+          top: Math.round(nav.getBoundingClientRect().top),
+          navH: parseInt(getComputedStyle(document.documentElement).getPropertyValue('--nav-height'), 10),
+          marked: nav.querySelectorAll('[aria-current]').length,
+        };
+      });
+      const target = await page.evaluate(() => {
+        const links = [...document.querySelectorAll('main > nav.toc a')];
+        return links[Math.floor(links.length / 2)].getAttribute('href');
+      });
+      const open = await page.locator('main > nav.toc details').evaluate((d) => d.open);
+      if (!open) await page.click('main > nav.toc summary');
+      await page.click(`main > nav.toc a[href="${target}"]`);
+      await page.waitForTimeout(600);
+      tocJump = await page.evaluate((href) => {
+        const h = document.getElementById(decodeURIComponent(href.slice(1)));
+        const navH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--nav-height'), 10);
+        const bar = document.querySelector('main > nav.toc');
+        // a column (wide screens) covers nothing above the heading; a bar covers down to its bottom
+        const covered = window.innerWidth >= 1200 ? navH : bar.getBoundingClientRect().bottom;
+        return {
+          top: Math.round(h.getBoundingClientRect().top),
+          covered: Math.round(covered),
+          vh: window.innerHeight,
+          closed: !bar.querySelector('details').open,
+        };
+      }, target);
+    }
     failures += report(label, {
       'article template': [r.bodyClass.split(' ').includes('article'), r.bodyClass],
       'blocks loaded': [r.allLoaded, r.blockStatus],
@@ -96,6 +160,30 @@ try {
       'infobox caption inside border': [!r.infobox || r.infobox.captionInside, r.infobox ? undefined : 'no infobox'],
       'infobox floats on desktop only': [!r.infobox || r.infobox.float === (label === 'desktop' ? 'right' : 'none'), r.infobox?.float],
       'maths rendered': [!r.mathPending && !r.mathErrors.length, `${r.mathRendered} rendered, ${r.mathPending} pending${r.mathErrors.length ? `, errors: ${JSON.stringify(r.mathErrors)}` : ''}`],
+      'contents list': [
+        r.toc.headings < 4 ? !r.toc.present
+          : r.toc.present && r.toc.entries === r.toc.headings && !r.toc.unresolved,
+        r.toc.present ? `${r.toc.entries} entries for ${r.toc.headings} headings, ${r.toc.unresolved} unresolved`
+          : `none (${r.toc.headings} headings)`,
+      ],
+      'contents layout (column on desktop, closed bar on mobile)': [
+        !r.toc.present || (label === 'desktop'
+          ? r.toc.open && r.toc.position === 'sticky' && r.toc.besideContent
+          : !r.toc.open && r.toc.height < 80),
+        r.toc.present ? `${r.toc.position}, ${r.toc.open ? 'open' : 'closed'}, height ${r.toc.height}` : undefined,
+      ],
+      'contents stays in view and marks the section': [
+        !tocScroll || (Math.abs(tocScroll.top - tocScroll.navH) <= 30 && tocScroll.marked === 1),
+        tocScroll ? `top ${tocScroll.top}px, ${tocScroll.marked} marked` : undefined,
+      ],
+      'contents jump lands below the header': [
+        !tocJump || (tocJump.top >= tocJump.covered && tocJump.top < tocJump.vh / 2
+          && (label === 'desktop' || tocJump.closed)),
+        tocJump ? `heading at ${tocJump.top}px, covered to ${tocJump.covered}px` : undefined,
+      ],
+      // warning only: the boilerplate's font swap (font-display: swap) shifts text on many pages;
+      // fonts blocked -> 0.000, so it must not block publishing content
+      'layout shift on load < 0.1': [cls < 0.1, cls.toFixed(3), 'warn'],
       'no horizontal scroll': [!r.hScroll],
     });
     await page.close();

@@ -345,6 +345,94 @@ body.article main sup {
   white-space: nowrap;
 }
 
+/* article contents (scripts/toc.js): a bar under the header; a sticky column on wide screens */
+body.article main :is(h2, h3) {
+  /* below the fixed header and the contents bar */
+  scroll-margin-top: calc(var(--nav-height) + 4rem);
+}
+
+body.article main > .toc {
+  position: sticky;
+  top: var(--nav-height);
+  z-index: 1;
+  border-bottom: 1px solid var(--infobox-border-color, #a2a9b1);
+  background-color: var(--background-color);
+  font-size: var(--body-font-size-xs);
+  line-height: 1.4;
+}
+
+body.article main > .toc summary {
+  padding: 0.6em 24px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+body.article main > .toc ol {
+  margin: 0;
+  padding: 0 0 0 1em;
+  list-style: none;
+}
+
+body.article main > .toc details > ol {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 0 24px 0.75em;
+}
+
+body.article main > .toc a:any-link {
+  display: block;
+  padding: 0.2em 0;
+  color: var(--text-color);
+}
+
+body.article main > .toc a[aria-current] {
+  color: var(--link-color);
+  font-weight: 600;
+}
+
+@media (width >= 1200px) {
+  body.article main :is(h2, h3) {
+    scroll-margin-top: calc(var(--nav-height) + 1rem);
+  }
+
+  body.article main.has-toc {
+    display: grid;
+    grid-template-columns: 15rem minmax(0, 1fr);
+    max-width: calc(1200px + 15rem);
+    margin: 0 auto;
+    padding-left: 32px;
+  }
+
+  /* one column beside every section: span more rows than any page has sections */
+  body.article main.has-toc > .toc {
+    grid-column: 1;
+    grid-row: 1 / span 1000;
+    align-self: start;
+    max-height: calc(100vh - var(--nav-height));
+    overflow-y: auto;
+    border-bottom: 0;
+    background-color: transparent;
+  }
+
+  /* the "Contents" label stays at the top of a long, scrolling column */
+  body.article main.has-toc > .toc summary {
+    position: sticky;
+    top: 0;
+    padding: 1.5rem 0 0.5em;
+    background-color: var(--background-color);
+  }
+
+  body.article main.has-toc > .toc details > ol {
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+  }
+
+  body.article main.has-toc > .section {
+    grid-column: 2;
+  }
+}
+
 /* inline ref markers, targeted by references-block backlinks */
 body.article main a[id*="-ref-"] {
   scroll-margin-top: calc(var(--nav-height) + 16px);

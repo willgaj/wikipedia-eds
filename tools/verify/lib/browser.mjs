@@ -38,12 +38,18 @@ export async function loadFully(page) {
     .every((b) => b.dataset.blockStatus === 'loaded'), null, { timeout: 15000 }).catch(() => {});
 }
 
-/** Prints PASS/FAIL lines and returns the number of failures. */
+/**
+ * Prints PASS/FAIL/WARN lines and returns the number of failures.
+ * A check given as [ok, detail, 'warn'] is reported but does not fail the run.
+ */
 export function report(label, checks) {
   let failures = 0;
-  Object.entries(checks).forEach(([name, [ok, detail]]) => {
-    if (!ok) failures += 1;
-    console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}  ${name}${detail !== undefined ? `: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}` : ''}`);
+  Object.entries(checks).forEach(([name, [ok, detail, level]]) => {
+    const warnOnly = level === 'warn';
+    if (!ok && !warnOnly) failures += 1;
+    let status = 'PASS';
+    if (!ok) status = warnOnly ? 'WARN' : 'FAIL';
+    console.log(`  ${status}  ${label}  ${name}${detail !== undefined ? `: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}` : ''}`);
   });
   return failures;
 }

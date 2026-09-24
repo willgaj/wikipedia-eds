@@ -11,6 +11,7 @@ import {
   loadCSS,
   buildBlock,
 } from './aem.js';
+import buildToc from './toc.js';
 
 if (window.trustedTypes && window.trustedTypes.createPolicy) {
   const innerTT = window.trustedTypes.createPolicy('tt-inner', {
@@ -153,6 +154,10 @@ export function decorateMain(main) {
   decorateSections(main);
   decorateBlocks(main);
   decorateButtons(main);
+  // article pages: contents column from the headings (the page itself, not nav/footer fragments)
+  if (document.body.classList.contains('article') && main === document.querySelector('body > main')) {
+    buildToc(main);
+  }
 }
 
 /**
