@@ -11,7 +11,9 @@
     "import": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tools/importer/run.mjs",
     "admin": "node tools/admin.mjs",
     "verify:article": "node tools/verify/article.mjs",
-    "verify:home": "node tools/verify/homepage.mjs"
+    "verify:home": "node tools/verify/homepage.mjs",
+    "cluster:pin": "node tools/importer/cluster.mjs",
+    "import:batch": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tools/importer/batch.mjs"
   },
   "repository": {
     "type": "git",

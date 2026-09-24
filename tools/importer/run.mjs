@@ -39,8 +39,24 @@ const { values: opts, positionals: [sourceUrl] } = parseArgs({
     publish: { type: 'boolean', default: false },
     'check-delivered': { type: 'boolean', default: false },
     out: { type: 'string', default: path.join(TOOLS, 'output', 'import') },
+    articles: { type: 'string', default: path.join(TOOLS, 'importer', 'articles.json') },
   },
 });
+
+/**
+ * Title (and every redirect to it) -> local web path, for each article in the cluster, so links
+ * between imported articles stay on this site.
+ */
+function localArticles(file) {
+  if (!fs.existsSync(file)) return {};
+  const map = {};
+  JSON.parse(fs.readFileSync(file, 'utf8')).articles.forEach(({ title, redirects = [] }) => {
+    const url = `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`;
+    const webPath = transformer.generateDocumentPath({ url });
+    [title, ...redirects].forEach((t) => { map[t] = webPath; });
+  });
+  return map;
+}
 
 if (!sourceUrl) {
   console.error('usage: npm run import -- <source-url> [--upload] [--preview] [--publish] [--check-delivered] [--out <dir>]');
@@ -75,7 +91,11 @@ step(`fetched ${sourceUrl} (${html.length} bytes)`);
 // 2. transform (import.js expects the importer UI's WebImporter global)
 const { document } = new JSDOM(`<!DOCTYPE html><html><body>${html}</body></html>`, { url: sourceUrl }).window;
 globalThis.WebImporter = { Blocks, DOMUtils };
-const params = { originalURL: sourceUrl };
+const params = {
+  originalURL: sourceUrl,
+  localArticles: localArticles(opts.articles),
+  siteOrigin: hostUrl('page'), // the pipeline rewrites own-site URLs to relative paths
+};
 const main = transformer.transformDOM({
   document, url: sourceUrl, html, params,
 });

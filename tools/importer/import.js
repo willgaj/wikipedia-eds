@@ -33,8 +33,11 @@ const REMOVE_CONTAINERS = [
   '.mw-editsection',
   '.geo-nondefault', '.geo-multi-punct', // duplicate decimal coordinates
   '.locmap', // location map: its marker label and caption would outlive the removed image
-  // citation maintenance notes, hidden from readers by TemplateStyles (not an inline style)
-  '.cs1-maint', '.cs1-hidden-error',
+  // citation maintenance/error notes for editors (the hidden ones via TemplateStyles)
+  '.cs1-maint', '.cs1-hidden-error', '.cs1-visible-error',
+  '.ambox', // maintenance banners ("This article needs more citations")
+  '.sidebar', // navigation sidebars, like navboxes
+  '.gallery', // image galleries: the captions would outlive the removed images
 ];
 
 /* Removed after maths is converted: hidden spans hold the MathML copy and microformat data. */
@@ -68,6 +71,7 @@ function parseSource(url) {
 function slugify(title) {
   return title.toLowerCase()
     .normalize('NFKD').replace(/\p{M}/gu, '')
+    .replace(/['’]/g, '') // "Tesla's oscillator" -> teslas-oscillator
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 }
@@ -123,9 +127,15 @@ function subheading(document, el, nodes) {
   return h;
 }
 
-/** `#cite-12` for the default group, `#note-a` for lower-alpha notes. */
+/**
+ * Anchor for a footnote: `#cite-12` (default group), `#note-a` (lower-alpha notes),
+ * `#note-3` (a named group such as {{efn|group=note}}, labelled "note 3").
+ * Must match the ids the references block generates for its variant.
+ */
 function refAnchor(group, label) {
-  return group === 'lower-alpha' ? `note-${label}` : `cite-${label}`;
+  if (!group) return `cite-${label}`;
+  if (group === 'lower-alpha') return `note-${label}`;
+  return `note-${label.replace(/^\D+/, '')}`;
 }
 
 /** Inline Parsoid ref markers -> <sup><a href="#cite-N">[N]</a></sup>. */
@@ -230,10 +240,42 @@ function tableGrid(table) {
  */
 function convertTables(document, root, report) {
   report.tables = {
-    blocks: 0, transposed: 0, unwrapped: 0, spans: 0,
+    blocks: 0,
+    transposed: 0,
+    unwrapped: 0,
+    spans: 0,
+    layout: 0,
+    colourCoded: 0,
+    headerRowsMerged: 0,
+    emptyColumns: 0,
   };
+
+  // Layout tables (neither data tables nor infoboxes: plaque text, legends, media boxes):
+  // content becomes default content; a table left with nothing but its title row is dropped.
+  [...root.querySelectorAll('table')].reverse().forEach((table) => {
+    if (table.matches('.wikitable, .infobox') || table.closest('.infobox')) return;
+    const rows = [...table.rows];
+    const titleRow = rows.length > 1 && rows[0].cells.length === 1 && rows[0].cells[0].tagName === 'TH';
+    const body = titleRow ? rows.slice(1) : rows;
+    const out = body.flatMap((tr) => [...tr.cells].flatMap((cell) => asBlocks(document, cell)))
+      .filter((el) => el.textContent.trim() || el.querySelector('code'));
+    if (out.length && titleRow) {
+      out.unshift(subheading(document, table, [...rows[0].cells[0].childNodes]));
+    }
+    table.replaceWith(...out);
+    report.tables.layout += 1;
+  });
+
   [...root.querySelectorAll('table.wikitable')].reverse().forEach((table) => {
     if (table.closest('.infobox')) return; // nested in an infobox: left for validation to flag
+    // colours that tell cells with text apart (a legend elsewhere) do not survive the conversion;
+    // colour-only swatch cells are handled below (their columns are empty and dropped)
+    const colourOf = (c) => (c.getAttribute('bgcolor')
+      || c.getAttribute('style')?.match(/background(?:-color)?:\s*([^;]+)/)?.[1] || '').trim().toLowerCase();
+    const colours = new Set([...table.querySelectorAll('[bgcolor], [style*="background"]')]
+      .filter((c) => c.textContent.trim())
+      .map(colourOf));
+    if (colours.size > 1) report.tables.colourCoded += 1;
     const { grid, spans } = tableGrid(table);
     let rows = grid;
     let caption = null;
@@ -245,6 +287,36 @@ function convertTables(document, root, report) {
     // columns that only exist because a spanning title row was wider than the content
     const used = rows[0].map((_, c) => rows.some((row) => row[c].cell && !row[c].empty));
     rows = rows.map((row) => row.filter((_, c) => used[c]));
+
+    // stacked header rows ("Phases" over "L1 L2 L3") -> one header row: "Phases L1", …
+    let headRows = 0;
+    while (headRows < rows.length - 1 && rows[headRows].every((s) => !s.cell || s.header)) {
+      headRows += 1;
+    }
+    if (headRows > 1) {
+      const merged = rows[0].map((_, c) => {
+        const seen = new Set();
+        const nodes = [];
+        rows.slice(0, headRows).forEach((row) => {
+          const { cell } = row[c];
+          if (!cell || seen.has(cell) || !cell.textContent.trim()) return;
+          seen.add(cell);
+          if (nodes.length) nodes.push(document.createTextNode(' '));
+          nodes.push(...[...cell.childNodes].map((n) => n.cloneNode(true)));
+        });
+        return { header: true, nodes };
+      });
+      rows = [merged, ...rows.slice(headRows)];
+      report.tables.headerRowsMerged += 1;
+    }
+    // columns empty in every data row, e.g. colour swatches beside a cell naming the colour
+    const dataRows = headRows ? rows.slice(1) : rows;
+    const hasData = (s) => s.cell && !s.empty && (s.cell.textContent.trim() || s.cell.querySelector('code'));
+    const keep = rows[0].map((_, c) => dataRows.some((row) => hasData(row[c])));
+    if (keep.includes(false) && keep.includes(true)) {
+      report.tables.emptyColumns += keep.filter((k) => !k).length;
+      rows = rows.map((row) => row.filter((_, c) => keep[c]));
+    }
     const width = rows[0].length;
 
     if (width <= 1) {
@@ -265,7 +337,8 @@ function convertTables(document, root, report) {
     const header = rows[0].every((slot) => slot.header || slot.empty);
     const content = (slot) => {
       const div = document.createElement('div');
-      if (slot.cell && !slot.empty) {
+      if (slot.nodes) div.append(...slot.nodes); // merged header
+      else if (slot.cell && !slot.empty) {
         div.append(...[...slot.cell.childNodes].map((n) => n.cloneNode(true)));
       }
       return div;
@@ -381,27 +454,44 @@ function buildInfobox(document, root, report) {
   main.replaceWith(WebImporter.Blocks.createBlock(document, { name: 'Infobox', cells: [[title], ...cleaned] }));
 }
 
+/**
+ * Reference lists -> `references` block. Variant by footnote group:
+ *   default group            -> (none)          ids cite-1, cite-2, …
+ *   lower-alpha ({{efn}})    -> notes           ids note-a, note-b, …
+ *   named group (group=note) -> numbered-notes  ids note-1, note-2, …
+ * Other groups, or two lists that would share ids, are reported for validation to reject.
+ */
 function buildReferences(document, root, report) {
   report.references = {};
+  report.referenceProblems = [];
+  const variantOf = (group) => {
+    if (!group) return [];
+    return group === 'lower-alpha' ? ['notes'] : ['numbered-notes'];
+  };
+  const seen = new Set();
   root.querySelectorAll('.mw-references-wrap').forEach((wrap) => {
     const ol = wrap.querySelector('ol.mw-references, ol.references, ol');
     if (!ol) return;
     const group = ol.getAttribute('data-mw-group') || '';
     const items = [...ol.children].filter((li) => li.tagName === 'LI');
+    const variant = variantOf(group).join(' ') || 'default';
+    if (seen.has(variant)) report.referenceProblems.push(`two reference lists share the ${variant} anchors (group "${group}")`);
+    seen.add(variant);
     const out = document.createElement('ol');
     items.forEach((li, i) => {
-      // sanity check: list position must match the rendered label the inline markers use
+      // list position must match the label the inline markers use (the block numbers by position)
+      const label = (li.getAttribute('data-mw-footnote-number') || '').replace(/^\D+(?=\d)/, '');
       const expected = group === 'lower-alpha' ? String.fromCharCode(97 + i) : String(i + 1);
-      const labelText = li.getAttribute('data-mw-footnote-number');
-      if (labelText && labelText !== expected) console.warn(`reference label ${labelText} at position ${expected}`);
+      if (label && label !== expected) {
+        report.referenceProblems.push(`group "${group || 'default'}": label ${label} at position ${expected}`);
+      }
       const text = li.querySelector('.mw-reference-text') || li;
       const n = document.createElement('li');
       n.append(...text.childNodes);
       out.append(n);
     });
     report.references[group || 'default'] = items.length;
-    const variants = group === 'lower-alpha' ? ['notes'] : [];
-    wrap.replaceWith(WebImporter.Blocks.createBlock(document, { name: 'References', variants, cells: [[out]] }));
+    wrap.replaceWith(WebImporter.Blocks.createBlock(document, { name: 'References', variants: variantOf(group), cells: [[out]] }));
   });
 }
 
@@ -415,7 +505,33 @@ function normalizeHeadings(document, root) {
   });
 }
 
-function normalizeLinks(root) {
+/** Heading id the delivery pipeline generates: lowercase, runs of other characters -> "-". */
+function fragmentId(fragment) {
+  let text = fragment;
+  try { text = decodeURIComponent(fragment); } catch { /* keep as is */ }
+  return text.replace(/_/g, ' ').toLowerCase().normalize('NFKD').replace(/\p{M}/gu, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Link to an article imported into this site -> the local page (titles and their redirects come
+ * from params.localArticles, built from articles.json). Everything else stays on Wikipedia.
+ */
+function localHref(href, params) {
+  const m = href.match(/^https:\/\/en\.wikipedia\.org\/wiki\/([^?#]+)(?:#(.*))?$/);
+  if (!m || !params?.localArticles) return null;
+  let title = m[1];
+  try { title = decodeURIComponent(title); } catch { /* keep as is */ }
+  title = title.replace(/_/g, ' ');
+  title = title.charAt(0).toUpperCase() + title.slice(1); // first letter is case-insensitive
+  const path = params.localArticles[title];
+  if (!path) return null;
+  return `${params.siteOrigin || ''}${path}${m[2] ? `#${fragmentId(m[2])}` : ''}`;
+}
+
+function normalizeLinks(root, params, report) {
+  report.localLinks = 0;
   // red links (article does not exist) -> plain text, as Wikipedia readers see them
   root.querySelectorAll('a.new, a[href*="redlink=1"]').forEach(unwrap);
   root.querySelectorAll('a[href]').forEach((a) => {
@@ -423,6 +539,11 @@ function normalizeLinks(root) {
     if (href.startsWith('./')) a.setAttribute('href', `${WIKI_ORIGIN}/wiki/${href.slice(2)}`);
     else if (href.startsWith('/wiki/')) a.setAttribute('href', `${WIKI_ORIGIN}${href}`);
     else if (href.startsWith('//')) a.setAttribute('href', `https:${href}`);
+    const local = localHref(a.getAttribute('href'), params);
+    if (local) {
+      a.setAttribute('href', local);
+      report.localLinks += 1;
+    }
   });
   root.querySelectorAll('a:not([href])').forEach(unwrap);
 }
@@ -508,7 +629,7 @@ export default {
     convertDefinitionLists(document, root);
     convertQuotes(document, root);
     normalizeHeadings(document, root);
-    normalizeLinks(root);
+    normalizeLinks(root, params, report);
 
     // blocks are <table>s from here on; clean everything around and inside them
     cleanMarkup(document, root);

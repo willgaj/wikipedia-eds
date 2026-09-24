@@ -42,6 +42,23 @@ Only published pages appear in `/query-index.json`, and therefore on the homepag
 Set `WIKIMEDIA_USER_AGENT` to add contact details to the User-Agent
 ([policy](https://foundation.wikimedia.org/wiki/Policy:User-Agent_policy)); the default names the repo.
 
+## Import the cluster
+
+`importer/articles.json` lists the cluster: title, group, pinned revision, and every redirect to the
+article. Links to any of these titles (or their redirects) are rewritten to the local `/wiki/…` page.
+
+```sh
+npm run cluster:pin                  # add revisions for new titles, refresh redirects
+npm run cluster:pin -- --refresh     # move every article to its current revision
+npm run import:batch -- --dry-run    # transform + validate all, no DA writes
+npm run import:batch -- --publish    # import, preview, delivered check, browser checks, publish
+npm run import:batch -- --only tesla-coil,transformer --publish
+```
+
+In a batch, each step gates the next: an article that fails validation, the delivered-markup
+check or the browser checks is left unpublished and listed at the end
+(`tools/output/batch-report.json`).
+
 ## Page lifecycle
 
 ```sh

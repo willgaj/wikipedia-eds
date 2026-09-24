@@ -4,6 +4,7 @@
  * Authoring model: one list (or one paragraph per entry) anywhere in the block.
  * Anchors come from list position: `#cite-1`, `#cite-2`, ...
  * Variant `notes`: lettered list, anchors `#note-a`, `#note-b`, ...
+ * Variant `numbered-notes`: numbered list, anchors `#note-1`, `#note-2`, ...
  * Inline markers are authored as superscript links: <sup><a href="#cite-12">[12]</a></sup>
  * @param {Element} block The references block element
  */
@@ -48,11 +49,12 @@ function addBacklinks(li, id) {
 
 export default function decorate(block) {
   const notes = block.classList.contains('notes');
+  const prefix = notes || block.classList.contains('numbered-notes') ? 'note' : 'cite';
   const ol = document.createElement('ol');
   if (notes) ol.type = 'a';
 
   collectItems(block).forEach((li, i) => {
-    const id = notes ? `note-${letter(i)}` : `cite-${i + 1}`;
+    const id = `${prefix}-${notes ? letter(i) : i + 1}`;
     li.id = id;
     addBacklinks(li, id);
     ol.append(li);

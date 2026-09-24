@@ -36,8 +36,9 @@ function refTargets(doc) {
 function stats(doc) {
   const blocks = {};
   blockRoots(doc).forEach((b) => { blocks[b.className] = (blocks[b.className] || 0) + 1; });
-  const citations = doc.querySelector('.references:not(.notes)');
-  const notes = doc.querySelector('.references.notes');
+  const refBlocks = blockRoots(doc).filter((b) => b.classList.contains('references'));
+  const isNotes = (b) => b.classList.contains('notes') || b.classList.contains('numbered-notes');
+  const items = (list) => list.reduce((n, b) => n + count(b, 'ol > li'), 0);
   const tables = blockRoots(doc).filter((b) => b.classList.contains('table'));
   return {
     mathCodes: [...doc.querySelectorAll('code')].filter((c) => /^\$[\s\S]+\$$/.test(c.textContent.trim())).length,
@@ -51,8 +52,8 @@ function stats(doc) {
     links: count(doc, 'a[href]'),
     listItems: count(doc, 'li'),
     refLinks: refTargets(doc).length,
-    citations: citations ? count(citations, 'ol > li') : 0,
-    notes: notes ? count(notes, 'ol > li') : 0,
+    citations: items(refBlocks.filter((b) => !isNotes(b))),
+    notes: items(refBlocks.filter(isNotes)),
   };
 }
 
@@ -84,6 +85,10 @@ export function validateDaHtml(html, expected = {}) {
       warnings.push(`${expected.tables.transposed} table(s) transposed (wide and short): check them`);
     }
     if (expected.tables.spans) warnings.push(`${expected.tables.spans} merged cell(s) split in tables`);
+    if (expected.tables.layout) warnings.push(`${expected.tables.layout} layout table(s) unwrapped to content`);
+    if (expected.tables.colourCoded) {
+      warnings.push(`${expected.tables.colourCoded} table(s) use cell colours, which are lost: check for meaning carried by colour`);
+    }
   }
   if (expected.descriptionFromLead) warnings.push('no short description: using the lead\'s first sentence');
 
@@ -136,10 +141,21 @@ export function validateDaHtml(html, expected = {}) {
   if (relative) errors.push(`${relative} document-relative link(s)`);
 
   // inline reference markers must resolve to a list position (lettering as in the references block)
+  // ids each references block will generate (see blocks/references): cite-N, note-a…, note-N
   const letter = (i) => (i >= 26 ? letter(Math.floor(i / 26) - 1) : '') + String.fromCharCode(97 + (i % 26));
-  const letters = new Set([...Array(s.notes)].map((_, i) => letter(i)));
+  const anchors = new Set();
+  const variants = new Set();
+  blockRoots(doc).filter((b) => b.classList.contains('references')).forEach((b) => {
+    const lettered = b.classList.contains('notes');
+    const prefix = lettered || b.classList.contains('numbered-notes') ? 'note' : 'cite';
+    const kind = `${prefix}-${lettered ? 'a' : '1'}`;
+    if (variants.has(kind)) errors.push(`two references blocks generate the same anchors (${prefix}-…)`);
+    variants.add(kind);
+    [...b.querySelectorAll('ol > li')].forEach((_, i) => anchors.add(`${prefix}-${lettered ? letter(i) : i + 1}`));
+  });
+  (expected.referenceProblems || []).forEach((p) => errors.push(`references: ${p}`));
   const targets = refTargets(doc);
-  const broken = targets.filter((t) => (t.startsWith('cite-') ? !(+t.slice(5) >= 1 && +t.slice(5) <= s.citations) : !letters.has(t.slice(5))));
+  const broken = targets.filter((t) => !anchors.has(t));
   if (broken.length) errors.push(`${broken.length} reference link(s) without a target: ${[...new Set(broken)].slice(0, 10).join(', ')}`);
   const cited = new Set(targets);
   const uncited = [...Array(s.citations)].map((_, i) => i + 1).filter((n) => !cited.has(`cite-${n}`));
@@ -147,7 +163,15 @@ export function validateDaHtml(html, expected = {}) {
 
   const otherFragments = [...doc.querySelectorAll('a[href^="#"]')].map((a) => a.getAttribute('href')).filter((h) => !/^#(cite|note)-/.test(h));
   if (otherFragments.length) warnings.push(`fragment links other than references: ${[...new Set(otherFragments)].slice(0, 10).join(', ')}`);
-  const tiny = [...doc.querySelectorAll('main > div > p')].filter((p) => p.textContent.trim().split(/\s+/).length <= 2 && !p.querySelector('a, sup, code'));
+  // short paragraphs that may be leaked fragments; lead-ins ("Further:") and bold pseudo-headings
+  // are ordinary text
+  const tiny = [...doc.querySelectorAll('main > div > p')].filter((p) => {
+    const text = p.textContent.trim();
+    const boldOnly = p.children.length === 1 && p.firstElementChild.tagName === 'STRONG'
+      && p.firstElementChild.textContent.trim() === text;
+    return text.split(/\s+/).length <= 2 && !p.querySelector('a, sup, code')
+      && !text.endsWith(':') && !boldOnly;
+  });
   if (tiny.length) warnings.push(`${tiny.length} very short paragraph(s), e.g. "${tiny[0].textContent.trim()}" (leaked fragments?)`);
 
   return { errors, warnings, stats: s };

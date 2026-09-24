@@ -5,8 +5,12 @@
 
 /** `References (notes)` -> `references notes` */
 function blockClass(header) {
-  const [, name, variants = ''] = header.trim().match(/^([^(]+)(?:\(([^)]*)\))?$/);
   const slug = (s) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  // a leftover source table (not built by the transform) can have any header text:
+  // give it a name the validator will reject instead of failing here
+  const m = header.trim().match(/^([^(]+)(?:\(([^)]*)\))?$/);
+  if (!m) return `unconverted-${slug(header).slice(0, 40)}`;
+  const [, name, variants = ''] = m;
   return [slug(name), ...variants.split(',').map(slug)].filter(Boolean).join(' ');
 }
 
