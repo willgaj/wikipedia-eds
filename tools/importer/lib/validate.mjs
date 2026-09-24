@@ -133,6 +133,8 @@ export function validateDaHtml(html, expected = {}) {
   const roots = new Set(blockRoots(doc));
   const stray = [...doc.querySelectorAll('main [class]')].filter((el) => !roots.has(el));
   if (stray.length) errors.push(`${stray.length} class attribute(s) outside block roots`);
+  const emptyHeadings = [...doc.querySelectorAll('h1, h2, h3, h4, h5, h6')].filter((h) => !h.textContent.trim()).length;
+  if (emptyHeadings) errors.push(`${emptyHeadings} empty heading(s) (the pipeline drops them)`);
   const codeLinks = count(doc, 'code a');
   if (codeLinks) errors.push(`${codeLinks} link(s) inside code spans (the pipeline drops them)`);
   const redlinks = count(doc, 'a[href*="redlink=1"]');

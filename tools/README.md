@@ -81,6 +81,7 @@ drops the page from the sitemap.
 npm run verify:article -- https://main--wikipedia-eds--willgaj.aem.live/wiki/nikola-tesla
 npm run verify:home                      # main preview against the real query index
 npm run verify:home -- --mock 30         # same page, 30 made-up index rows (nothing on the site changes)
+npm run verify:links                     # every local /wiki/ link on live reaches a page (and its anchor)
 ```
 
 Both check desktop and mobile, write screenshots to `tools/output/verify/`, and exit 1 on failure.
@@ -92,5 +93,7 @@ Defaults target `willgaj/wikipedia-eds` on `main`; override with `AEM_ORG`, `AEM
 - Network calls in `tools/` use `fetch` from `tools/lib/http.mjs` (undici 8), not Node's global
   `fetch`: once jsdom has loaded undici 8, Node's built-in fetch can return compressed bodies
   undecoded, depending on import order.
-- The delivery pipeline drops links inside code spans, turns `dl/dd` into bullet lists and
-  percent-encodes non-ASCII URLs; the transform and validator account for all three.
+- The delivery pipeline drops links inside code spans and empty headings, turns `dl/dd` into
+  bullet lists and percent-encodes non-ASCII URLs; the transform and validator account for these.
+- The CDN sends gzip even when a client does not ask for it: use `curl --compressed` when
+  grepping served files.

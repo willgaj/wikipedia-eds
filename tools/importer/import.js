@@ -363,6 +363,8 @@ function convertDefinitionLists(document, root) {
     const out = [];
     items.forEach((item) => {
       if (item.tagName === 'DT') {
+        // a stray `;` or a term that only held an image: nothing left to show
+        if (!item.textContent.trim() && !item.querySelector('code')) return;
         if (onlyTerms) { out.push(subheading(document, dl, [...item.childNodes])); return; }
         const p = document.createElement('p');
         const strong = document.createElement('strong');
@@ -572,7 +574,11 @@ function cleanMarkup(document, root) {
   // block quotes hold paragraphs, not bare text
   root.querySelectorAll('blockquote').forEach((bq) => bq.replaceChildren(...asBlocks(document, bq)));
 
-  // empty paragraphs / list items / emphasis left behind by removals (<p><br></p> included)
+  // empty headings (the delivery pipeline drops them) and empty paragraphs / list items /
+  // emphasis left behind by removals (<p><br></p> included)
+  root.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((h) => {
+    if (!h.textContent.trim() && !h.querySelector('code')) h.remove();
+  });
   root.querySelectorAll('p, li, strong, em, sup').forEach((el) => {
     if (!el.textContent.trim() && !el.querySelector('a, code')
       && (el.tagName === 'P' || !el.querySelector('br'))) el.remove();

@@ -13,7 +13,8 @@
     "verify:article": "node tools/verify/article.mjs",
     "verify:home": "node tools/verify/homepage.mjs",
     "cluster:pin": "node tools/importer/cluster.mjs",
-    "import:batch": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tools/importer/batch.mjs"
+    "import:batch": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tools/importer/batch.mjs",
+    "verify:links": "node tools/verify/links.mjs"
   },
   "repository": {
     "type": "git",
