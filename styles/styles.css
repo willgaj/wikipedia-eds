@@ -19,38 +19,25 @@
   --link-color: #3b63fb;
   --link-hover-color: #1d3ecf;
 
-  /* fonts */
-  --body-font-family: roboto, roboto-fallback, sans-serif;
-  --heading-font-family: roboto-condensed, roboto-condensed-fallback, sans-serif;
+  /* fonts: system stacks, as on Wikipedia (serif for h1/h2); no web fonts, so no swap shifts */
+  --body-font-family: system-ui, -apple-system, "Segoe UI", "Helvetica Neue", arial, sans-serif;
+  --heading-font-family: "Linux Libertine", georgia, "Times New Roman", times, serif;
 
   /* body sizes */
   --body-font-size-m: 22px;
   --body-font-size-s: 19px;
   --body-font-size-xs: 17px;
 
-  /* heading sizes */
-  --heading-font-size-xxl: 55px;
-  --heading-font-size-xl: 44px;
-  --heading-font-size-l: 34px;
-  --heading-font-size-m: 27px;
-  --heading-font-size-s: 24px;
-  --heading-font-size-xs: 22px;
+  /* heading sizes (mobile: sized for the serif, which is wider than the old condensed face) */
+  --heading-font-size-xxl: 36px;
+  --heading-font-size-xl: 30px;
+  --heading-font-size-l: 25px;
+  --heading-font-size-m: 22px;
+  --heading-font-size-s: 20px;
+  --heading-font-size-xs: 19px;
 
   /* nav height */
   --nav-height: 64px;
-}
-
-/* fallback fonts */
-@font-face {
-  font-family: roboto-condensed-fallback;
-  size-adjust: 88.82%;
-  src: local('Arial');
-}
-
-@font-face {
-  font-family: roboto-fallback;
-  size-adjust: 99.529%;
-  src: local('Arial');
 }
 
 @media (width >= 900px) {
@@ -110,6 +97,7 @@ h6 {
   font-weight: 600;
   line-height: 1.25;
   scroll-margin: 40px;
+  overflow-wrap: break-word; /* last resort for a single word wider than the column */
 }
 
 h1 { font-size: var(--heading-font-size-xxl); }
@@ -118,6 +106,14 @@ h3 { font-size: var(--heading-font-size-l); }
 h4 { font-size: var(--heading-font-size-m); }
 h5 { font-size: var(--heading-font-size-s); }
 h6 { font-size: var(--heading-font-size-xs); }
+
+/* as on Wikipedia: serif for the title and sections, bold sans-serif below */
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--body-font-family);
+}
 
 p,
 dl,

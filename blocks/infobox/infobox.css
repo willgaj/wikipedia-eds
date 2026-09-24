@@ -13,7 +13,7 @@
 
 .infobox caption {
   padding: 0.4em;
-  font-family: var(--heading-font-family);
+  font-family: var(--body-font-family);
   font-size: var(--heading-font-size-s);
   font-weight: 600;
   text-align: center;
