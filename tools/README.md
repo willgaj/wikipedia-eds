@@ -85,6 +85,8 @@ npm run verify:links                     # every local /wiki/ link on live reach
 ```
 
 Both check desktop and mobile, write screenshots to `tools/output/verify/`, and exit 1 on failure.
+`verify:article` includes layout shift on load (CLS < 0.1), which also gates `import:batch`
+publishing: a code change that makes pages jump blocks content from going live until it is fixed.
 
 Defaults target `willgaj/wikipedia-eds` on `main`; override with `AEM_ORG`, `AEM_SITE`, `AEM_REF`.
 

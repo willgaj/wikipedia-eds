@@ -181,9 +181,8 @@ try {
           && (label === 'desktop' || tocJump.closed)),
         tocJump ? `heading at ${tocJump.top}px, covered to ${tocJump.covered}px` : undefined,
       ],
-      // warning only: the boilerplate's font swap (font-display: swap) shifts text on many pages;
-      // fonts blocked -> 0.000, so it must not block publishing content
-      'layout shift on load < 0.1': [cls < 0.1, cls.toFixed(3), 'warn'],
+      // blocking: every article measured 0.000 once web fonts were removed (system font stacks)
+      'layout shift on load < 0.1': [cls < 0.1, cls.toFixed(3)],
       'no horizontal scroll': [!r.hScroll],
     });
     await page.close();
